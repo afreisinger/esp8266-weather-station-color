@@ -35,12 +35,13 @@
 #include "TouchControllerWS.h"
 #include "SunMoonCalc.h"
 
-
+#include "SensorWS.h"
 /***
    Install the following libraries through Arduino Library Manager
    - Mini Grafx by Daniel Eichhorn
    - ESP8266 WeatherStation by Daniel Eichhorn
    - Json Streaming Parser by Daniel Eichhorn
+   - DHTesp by Bernd Giesecke
  ***/
 
 #include <JsonListener.h>
@@ -82,20 +83,18 @@ ADC_MODE(ADC_VCC);
 ILI9341_SPI tft = ILI9341_SPI(TFT_CS, TFT_DC);
 MiniGrafx gfx = MiniGrafx(&tft, BITS_PER_PIXEL, palette);
 Carousel carousel(&gfx, 0, 0, 240, 100);
-
-
 XPT2046_Touchscreen ts(TOUCH_CS, TOUCH_IRQ);
 TouchControllerWS touchController(&ts);
 
 void calibrationCallback(int16_t x, int16_t y);
 CalibrationCallback calibration = &calibrationCallback;
-
-
 OpenWeatherMapCurrentData currentWeather;
 OpenWeatherMapForecastData forecasts[MAX_FORECASTS];
 
 Astronomy::MoonData moonData;
 //SunMoonCalc::Moon moonData;
+ 
+SensorWS sensor(PIN, SensorWS::TYPE);
 
 void updateData();
 void drawProgress(uint8_t percentage, String text);
@@ -117,13 +116,16 @@ void drawForecast1(MiniGrafx *display, CarouselState* state, int16_t x, int16_t 
 void drawForecast2(MiniGrafx *display, CarouselState* state, int16_t x, int16_t y);
 void drawForecast3(MiniGrafx *display, CarouselState* state, int16_t x, int16_t y);
 void loadPropertiesFromSpiffs();
+void updateSensor();
 
 FrameCallback frames[] = { drawForecast1, drawForecast2, drawForecast3 };
 int frameCount = 3;
 
 // how many different screens do we have?
 int screenCount = 5;
+
 long lastDownloadUpdate = millis();
+long lastSensorUpdate = millis();
 
 uint16_t screen = 0;
 long timerPress;
@@ -224,8 +226,14 @@ void setup() {
 
   initTime();
 
-  // update the weather information
+  // update the weather information and sensor
   updateData();
+  //updateSensor();
+  if (HAVE_SENSOR) {
+      updateSensor();
+      lastSensorUpdate = millis();
+  }
+
   timerPress = millis();
   canBtnPress = true;
 }
@@ -279,6 +287,11 @@ void loop() {
     lastDownloadUpdate = millis();
   }
 
+  if (HAVE_SENSOR && millis() -  lastSensorUpdate > 1000 * UPDATE_INTERVAL_SENSOR_SECS) { 
+    updateSensor();
+    lastSensorUpdate = millis();
+  }
+ 
   if (SLEEP_INTERVAL_SECS && millis() - timerPress >= SLEEP_INTERVAL_SECS * 1000) { // after 2 minutes go to sleep
     drawProgress(25, "Going to Sleep!");
     delay(1000);
@@ -334,6 +347,9 @@ void updateData() {
   delay(1000);
 }
 
+void updateSensor() {
+  sensor.getValues();
+}
 // Progress bar helper
 void drawProgress(uint8_t percentage, String text) {
   gfx.fillBuffer(MINI_BLACK);
