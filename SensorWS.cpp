@@ -31,6 +31,7 @@ bool SensorWS::getValues(){
     float cr =this->getComfortRatio(cf, newValues.temperature, newValues.humidity);
 
   String comfortStatus;
+  Serial.println(cf);
   switch(cf) {
     case Comfort_OK:
       comfortStatus = "OK";
@@ -72,7 +73,7 @@ bool SensorWS::getValues(){
     this->computeHeatIndex(newValues.temperature, newValues.humidity, false),
     this->computeHeatIndex(this->toFahrenheit(newValues.temperature),newValues.humidity, true),
     this->computeDewPoint(newValues.temperature, newValues.humidity),
-    comfortStatus);
+    comfortStatus.c_str());
 
 return true;
 
